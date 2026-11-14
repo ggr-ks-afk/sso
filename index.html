@@ -102,10 +102,10 @@ button{font:inherit;cursor:pointer}
   var CONFIG={
     orgName:"社内ポータル",
     helpText:"サインインできない場合は、情報システム担当にお問い合わせください。",
-    demoMode:true,            /* false にするとSupabaseで実際に認証する */
-    supabaseUrl:"https://YOUR-PROJECT.supabase.co",  /* SupabaseのProject URL */
-    supabaseKey:"YOUR-ANON-KEY",                      /* anon（publishable）キーのみ。service_roleは絶対に入れない */
-    usernameDomain:"users.example.com",               /* ユーザー名 → ユーザー名@このドメイン に変換してログイン */
+    demoMode:false,            /* false にするとSupabaseで実際に認証する */
+    supabaseUrl:"https://evyoevvtxndcfwafvlaf.supabase.co",  /* SupabaseのProject URL */
+    supabaseKey:"sb_publishable_91iAFeJUjlrO2mW4zpT1Eg_CiXK8mbZ",                      /* anon（publishable）キーのみ。service_roleは絶対に入れない */
+    usernameDomain:"intra.f5.si",               /* ユーザー名 → ユーザー名@このドメイン に変換してログイン */
     loginUrl:"/api/login",    /* Supabase以外の自前サーバーを使う場合のみ */
     demoAccount:{user:"demo",pass:"demo1234"}  /* デモ専用。本番では使われない */
   };
