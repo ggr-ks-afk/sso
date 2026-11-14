@@ -47,6 +47,12 @@ button{font:inherit;cursor:pointer}
 .app b{display:block;margin:8px 0 2px}
 .dot{width:34px;height:34px;border-radius:10px;display:grid;place-items:center;font-weight:700;color:#fff}
 .sess{font-size:.85rem;color:var(--sub);margin-top:22px}
+.bar{display:flex;gap:8px;flex-wrap:wrap}
+.erow{display:flex;gap:8px;flex-wrap:wrap;align-items:center;padding:12px;border:1px solid var(--line);border-radius:10px;background:var(--surface);margin-bottom:10px}
+.erow input[type=text]{flex:1 1 150px;width:auto}.erow input[type=color]{width:44px;height:40px;padding:2px;flex:none}
+.erow .u{flex:2 1 220px}
+.erow button:disabled{opacity:.4;cursor:default}
+.badge{display:inline-block;margin-left:8px;padding:1px 10px;border-radius:99px;background:var(--accent);color:var(--accent-ink);font-size:.75rem;vertical-align:middle}
 [hidden]{display:none!important}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 </style>
@@ -84,15 +90,21 @@ button{font:inherit;cursor:pointer}
   <section id="home" hidden>
     <div class="head">
       <div><h1 id="hello"></h1><p class="sub">ログインしたまま、すべてのアプリを開けます。</p></div>
-      <button class="ghost" id="out">サインアウト</button>
+      <div class="bar"><button class="ghost" id="edit" hidden>タイルを編集</button><button class="ghost" id="out">サインアウト</button></div>
     </div>
-    <div class="apps">
-      <a class="app" href="#"><div class="dot" style="background:#2b6cb0">勤</div><b>勤怠管理</b><span class="sub">打刻・休暇申請</span></a>
-      <a class="app" href="#"><div class="dot" style="background:#b7791f">経</div><b>経費精算</b><span class="sub">申請・承認</span></a>
-      <a class="app" href="#"><div class="dot" style="background:#2f855a">社</div><b>社内Wiki</b><span class="sub">ナレッジ検索</span></a>
-      <a class="app" href="#"><div class="dot" style="background:#9b2c6b">人</div><b>人事システム</b><span class="sub">給与明細・各種手続き</span></a>
+    <div class="apps" id="apps"></div>
+    <div class="msg" id="tmsg" role="status" aria-live="polite"></div>
+    <p class="sess" id="sess"></p>
+  </section>
+
+  <section id="admin" hidden>
+    <div class="head">
+      <div><h1>タイルの編集<span class="badge">管理者</span></h1><p class="sub">ユーザーのホーム画面に表示されるタイルを変更します。</p></div>
+      <div class="bar"><button class="ghost" id="add">＋ タイルを追加</button></div>
     </div>
-    <p class="sess">サインイン方法：ユーザー名とパスワード</p>
+    <div id="rows"></div>
+    <div class="bar" style="margin-top:14px"><button class="primary" id="save" style="width:auto;margin:0;padding:10px 22px">保存</button><button class="ghost" id="cancel">キャンセル</button></div>
+    <div class="msg" id="emsg" role="status" aria-live="polite"></div>
   </section>
 </main>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.0/dist/umd/supabase.js"></script>
@@ -102,89 +114,152 @@ button{font:inherit;cursor:pointer}
   var CONFIG={
     orgName:"社内ポータル",
     helpText:"サインインできない場合は、情報システム担当にお問い合わせください。",
-    demoMode:false,            /* false にするとSupabaseで実際に認証する */
-    supabaseUrl:"https://evyoevvtxndcfwafvlaf.supabase.co",  /* SupabaseのProject URL */
-    supabaseKey:"sb_publishable_91iAFeJUjlrO2mW4zpT1Eg_CiXK8mbZ",                      /* anon（publishable）キーのみ。service_roleは絶対に入れない */
-    usernameDomain:"sso.intra.f5.si",               /* ユーザー名 → ユーザー名@このドメイン に変換してログイン */
-    loginUrl:"/api/login",    /* Supabase以外の自前サーバーを使う場合のみ */
-    demoAccount:{user:"demo",pass:"demo1234"}  /* デモ専用。本番では使われない */
+    demoMode:false,                                   /* false にするとSupabaseで実際に認証・保存する */
+    supabaseUrl:"https://evyoevvtxndcfwafvlaf.supabase.co",
+    supabaseKey:"sb_publishable_91iAFeJUjlrO2mW4zpT1Eg_CiXK8mbZ",                     /* anonキーのみ。service_roleは絶対に入れない */
+    usernameDomain:"sso.intra.f5.si",              /* ユーザー名 → ユーザー名@このドメイン に変換 */
+    demoAccount:{user:"demo",pass:"demo1234"},       /* デモ専用 */
+    adminAccount:{user:"admin",pass:"admin1234"}     /* デモ専用 */
   };
+  var DEMO_TILES=[
+    {label:"勤怠管理",sub:"打刻・休暇申請",color:"#2b6cb0",url:"#"},
+    {label:"経費精算",sub:"申請・承認",color:"#b7791f",url:"#"},
+    {label:"社内Wiki",sub:"ナレッジ検索",color:"#2f855a",url:"#"},
+    {label:"人事システム",sub:"給与明細・各種手続き",color:"#9b2c6b",url:"#"}
+  ];
   /* ============================================ */
   var $=function(i){return document.getElementById(i)};
   var steps=document.querySelectorAll("#flow li");
-  var fails=0;
+  var fails=0,tiles=[],draft=[];
   var sb=(!CONFIG.demoMode&&window.supabase)?window.supabase.createClient(CONFIG.supabaseUrl,CONFIG.supabaseKey):null;
-  function setStep(n){steps.forEach(function(li,i){li.classList.toggle("on",i<=n)})}
-  function say(t,c){var m=$("msg");m.textContent=t;m.className="msg "+(c||"")}
   var wait=function(ms){return new Promise(function(r){setTimeout(r,ms)})};
+  var clone=function(t){return Object.assign({},t)};
+  var isAdminUser=function(u){return !!u&&(u.app_metadata||{}).app_role==="admin"};
+  var safeUrl=function(u){return /^(https?:\/\/\S+|#)$/.test(u||"")?u:"#"};
+  function h(tag,a,kids){var e=document.createElement(tag);for(var k in a){if(k==="text")e.textContent=a[k];else if(k==="class")e.className=a[k];else e[k]=a[k]}(kids||[]).forEach(function(x){e.appendChild(x)});return e}
+  function setStep(n){steps.forEach(function(li,i){li.classList.toggle("on",i<=n)})}
+  function say(id,t,c){var m=$(id);m.textContent=t;m.className="msg "+(c||"")}
+
   $("org").textContent=CONFIG.orgName;
   document.title=CONFIG.orgName+" | サインイン";
   if(CONFIG.demoMode){
-    $("hint").innerHTML="デモ用アカウント：ユーザー名 <code>"+CONFIG.demoAccount.user+"</code>／パスワード <code>"+CONFIG.demoAccount.pass+"</code>";
+    $("hint").innerHTML="デモ用アカウント：<code>"+CONFIG.demoAccount.user+"</code>／<code>"+CONFIG.demoAccount.pass+"</code>（一般）、<code>"+CONFIG.adminAccount.user+"</code>／<code>"+CONFIG.adminAccount.pass+"</code>（管理者）";
   }else{$("hint").textContent=CONFIG.helpText}
 
+  /* ---- 認証 ---- */
   async function check(u,p){
     if(CONFIG.demoMode){
-      await wait(800);
-      return u===CONFIG.demoAccount.user&&p===CONFIG.demoAccount.pass?{ok:true,name:u}:{ok:false};
+      await wait(700);
+      if(u===CONFIG.adminAccount.user&&p===CONFIG.adminAccount.pass)return {ok:true,name:u,admin:true};
+      if(u===CONFIG.demoAccount.user&&p===CONFIG.demoAccount.pass)return {ok:true,name:u,admin:false};
+      return {ok:false};
     }
-    if(sb){
-      var em=u.indexOf("@")>0?u:u+"@"+CONFIG.usernameDomain;
-      var r=await sb.auth.signInWithPassword({email:em,password:p});
-      if(r.error){
-        if([400,401,422].indexOf(r.error.status)>=0)return {ok:false};
-        throw r.error;
-      }
-      return {ok:true,name:u};
-    }
-    var res=await fetch(CONFIG.loginUrl,{method:"POST",credentials:"include",
-      headers:{"Content-Type":"application/json"},body:JSON.stringify({username:u,password:p})});
-    if(res.status===401||res.status===403)return {ok:false};
-    if(!res.ok)throw new Error("server");
-    return res.json();
+    var em=u.indexOf("@")>0?u:u+"@"+CONFIG.usernameDomain;
+    var r=await sb.auth.signInWithPassword({email:em,password:p});
+    if(r.error){if([400,401,422].indexOf(r.error.status)>=0)return {ok:false};throw r.error}
+    return {ok:true,name:u,admin:isAdminUser(r.data.user)};
   }
   async function signIn(e){
     e.preventDefault();
     var u=$("user").value.trim(),p=$("pass").value;
-    if(!u||!p){say("ユーザー名とパスワードを両方入力してください。","err");return}
+    if(!u||!p){say("msg","ユーザー名とパスワードを両方入力してください。","err");return}
     $("go").disabled=true;$("user").readOnly=$("pass").readOnly=true;
-    setStep(1);say("認証サーバーで確認しています…");
+    setStep(1);say("msg","認証サーバーで確認しています…");
     var r;
-    try{r=await check(u,p)}catch(err){
-      r=null;setStep(0);say("認証サーバーに接続できません。時間をおいて再度お試しください。","err");
-    }
-    if(r&&r.ok){
-      setStep(2);say("サインインしました。","ok");await wait(400);
-      fails=0;show(r.name||u);return;
-    }
+    try{r=await check(u,p)}catch(err){r=null;setStep(0);say("msg","認証サーバーに接続できません。時間をおいて再度お試しください。","err")}
+    if(r&&r.ok){setStep(2);say("msg","サインインしました。","ok");await wait(400);fails=0;show(r.name,r.admin);return}
     if(r){
       fails++;setStep(0);$("pass").value="";
-      if(fails>=5){
-        say("失敗が続いたため、15秒間入力できません。","err");
-        await wait(15000);fails=0;say("");
-      }else{say("ユーザー名またはパスワードが正しくありません。","err")}
+      if(fails>=5){say("msg","失敗が続いたため、15秒間入力できません。","err");await wait(15000);fails=0;say("msg","")}
+      else say("msg","ユーザー名またはパスワードが正しくありません。","err");
     }
-    $("go").disabled=false;$("user").readOnly=$("pass").readOnly=false;
-    $("pass").focus();
+    $("go").disabled=false;$("user").readOnly=$("pass").readOnly=false;$("pass").focus();
   }
-  function show(name){
-    $("login").hidden=true;$("home").hidden=false;
+
+  /* ---- タイル表示 ---- */
+  async function loadTiles(){
+    say("tmsg","");
+    if(!sb){if(!tiles.length)tiles=DEMO_TILES.map(clone);renderTiles();return}
+    var r=await sb.from("tiles").select("*").order("sort");
+    if(r.error){say("tmsg","タイルを読み込めませんでした。","err");tiles=[]}else tiles=r.data;
+    renderTiles();
+  }
+  function renderTiles(){
+    var box=$("apps");box.textContent="";
+    tiles.forEach(function(t){
+      var url=safeUrl(t.url),ext=url.charAt(0)!=="#";
+      var a=h("a",{class:"app",href:url});
+      if(ext){a.target="_blank";a.rel="noopener noreferrer"}
+      var dot=h("div",{class:"dot",text:(t.label||"?").charAt(0)});dot.style.background=/^#[0-9a-fA-F]{6}$/.test(t.color)?t.color:"#2b6cb0";
+      a.appendChild(dot);a.appendChild(h("b",{text:t.label}));a.appendChild(h("span",{class:"sub",text:t.sub||""}));
+      box.appendChild(a);
+    });
+  }
+
+  /* ---- 管理者：タイル編集 ---- */
+  function openEditor(){draft=tiles.map(clone);$("home").hidden=true;$("admin").hidden=false;say("emsg","");drawEditor()}
+  function closeEditor(){$("admin").hidden=true;$("home").hidden=false;renderTiles()}
+  function drawEditor(){
+    var box=$("rows");box.textContent="";
+    draft.forEach(function(t,i){
+      function txt(key,ph,max,label,cls){var x=h("input",{type:"text",placeholder:ph,maxLength:max,value:t[key]||"",class:cls||""});x.setAttribute("aria-label",label);x.addEventListener("input",function(){t[key]=x.value});return x}
+      var col=h("input",{type:"color",value:/^#[0-9a-fA-F]{6}$/.test(t.color)?t.color:"#2b6cb0"});col.setAttribute("aria-label","色");col.addEventListener("input",function(){t.color=col.value});
+      function btn(text,label,fn,dis){var b=h("button",{type:"button",class:"ghost",text:text,disabled:!!dis});b.setAttribute("aria-label",label);b.addEventListener("click",fn);return b}
+      function mv(d){return function(){var j=i+d,x=draft[i];draft[i]=draft[j];draft[j]=x;drawEditor()}}
+      box.appendChild(h("div",{class:"erow"},[col,txt("label","名前",40,"名前"),txt("sub","説明",80,"説明"),txt("url","https://…",300,"リンク先URL","u"),
+        btn("↑","上へ",mv(-1),i===0),btn("↓","下へ",mv(1),i===draft.length-1),
+        btn("削除","削除",function(){draft.splice(i,1);drawEditor()})]));
+    });
+    if(!draft.length)box.appendChild(h("p",{class:"sub",text:"タイルがありません。「＋ タイルを追加」から作成してください。"}));
+  }
+  async function save(){
+    for(var i=0;i<draft.length;i++){
+      var t=draft[i];t.label=(t.label||"").trim();t.url=(t.url||"").trim();t.sub=(t.sub||"").trim();
+      if(!t.label){say("emsg","タイル"+(i+1)+"：名前を入力してください。","err");return}
+      if(!/^(https?:\/\/\S+|#)$/.test(t.url)){say("emsg","タイル"+(i+1)+"：URLは https:// で始めるか、# にしてください。","err");return}
+    }
+    $("save").disabled=true;say("emsg","保存しています…");
+    try{
+      if(sb){
+        var keep=draft.filter(function(t){return t.id}).map(function(t){return t.id});
+        var del=tiles.filter(function(t){return keep.indexOf(t.id)<0}).map(function(t){return t.id});
+        if(del.length){var d=await sb.from("tiles").delete().in("id",del);if(d.error)throw d.error}
+        var rows=draft.map(function(t,i){var o={label:t.label,sub:t.sub,color:t.color,url:t.url,sort:i};if(t.id)o.id=t.id;return o});
+        var up=rows.filter(function(o){return o.id}),nw=rows.filter(function(o){return !o.id});
+        if(up.length){var u=await sb.from("tiles").upsert(up);if(u.error)throw u.error}
+        if(nw.length){var n=await sb.from("tiles").insert(nw);if(n.error)throw n.error}
+        await loadTiles();
+      }else{tiles=draft.map(clone)}
+      closeEditor();
+    }catch(err){say("emsg","保存できませんでした。管理者権限の設定（付与後は再ログインが必要）とRLSを確認してください。","err")}
+    $("save").disabled=false;
+  }
+
+  /* ---- 画面遷移 ---- */
+  function show(name,admin){
+    $("login").hidden=true;$("home").hidden=false;$("admin").hidden=true;
     $("hello").textContent=name+" さん、こんにちは";
+    $("edit").hidden=!admin;
+    $("sess").textContent="サインイン方法：ユーザー名とパスワード／権限："+(admin?"管理者":"一般");
     $("go").disabled=false;$("user").readOnly=$("pass").readOnly=false;
+    loadTiles();
   }
   function signOut(){
     if(sb)sb.auth.signOut();
-    $("home").hidden=true;$("login").hidden=false;
-    $("user").value=$("pass").value="";say("");setStep(0);$("user").focus();
+    $("home").hidden=true;$("admin").hidden=true;$("login").hidden=false;
+    $("user").value=$("pass").value="";say("msg","");setStep(0);$("user").focus();
   }
   $("form").addEventListener("submit",signIn);
-  if(sb){sb.auth.getSession().then(function(d){var s=d.data&&d.data.session;if(s)show((s.user.email||"").split("@")[0])})}
   $("out").addEventListener("click",signOut);
+  $("edit").addEventListener("click",openEditor);
+  $("cancel").addEventListener("click",closeEditor);
+  $("add").addEventListener("click",function(){draft.push({label:"",sub:"",color:"#2b6cb0",url:"https://"});drawEditor()});
+  $("save").addEventListener("click",save);
   $("toggle").addEventListener("click",function(){
-    var show=$("pass").type==="password";
-    $("pass").type=show?"text":"password";
-    this.textContent=show?"隠す":"表示";
+    var sh=$("pass").type==="password";
+    $("pass").type=sh?"text":"password";this.textContent=sh?"隠す":"表示";
   });
+  if(sb){sb.auth.getSession().then(function(d){var s=d.data&&d.data.session;if(s)show((s.user.email||"").split("@")[0],isAdminUser(s.user))})}
 })();
 </script>
 </body>
