@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>サインイン | ポータル</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#eef1f6;--surface:#fff;--ink:#1b2433;--sub:#5a6577;--line:#d3d9e4;--accent:#0e6f7a;--accent-ink:#fff;--warn:#b3261e;--ok:#1f7a4d;
+box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);color-scheme:light}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0f1520;--surface:#18202e;--ink:#e8edf6;--sub:#9aa6ba;--line:#2c3649;--accent:#4cc3d0;--accent-ink:#0a1a1d;--warn:#ff8a80;--ok:#6fd6a0;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#0f1520;--surface:#18202e;--ink:#e8edf6;--sub:#9aa6ba;--line:#2c3649;--accent:#4cc3d0;--accent-ink:#0a1a1d;--warn:#ff8a80;--ok:#6fd6a0;color-scheme:dark}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:"Zen Kaku Gothic New","Hiragino Sans","Yu Gothic",Meiryo,sans-serif;line-height:1.7;min-height:100vh}
+main{max-width:920px;margin:0 auto;padding:40px 20px}
+h1{font-size:1.5rem;margin:0 0 4px;letter-spacing:.02em}
+p{margin:0}.sub{color:var(--sub);font-size:.92rem}
+.brand{display:flex;align-items:center;gap:10px;margin-bottom:28px;font-weight:700}
+.mark{width:28px;height:28px;border-radius:8px;background:var(--accent);display:grid;place-items:center;color:var(--accent-ink);font-size:.9rem}
+.flow{display:flex;align-items:center;margin:0 0 28px;padding:0;list-style:none;overflow-x:auto}
+.flow li{display:flex;align-items:center;font-size:.82rem;color:var(--sub);white-space:nowrap}
+.flow li span{padding:4px 12px;border:1px solid var(--line);border-radius:99px;background:var(--surface);transition:.25s}
+.flow li+li::before{content:"";width:28px;height:2px;background:var(--line);transition:.25s}
+.flow li.on span{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.flow li.on::before{background:var(--accent)}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:28px;max-width:440px}
+.field{margin-top:18px}
+label{display:block;font-weight:700;font-size:.9rem;margin-bottom:6px}
+input{width:100%;font:inherit;padding:11px 12px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink)}
+input:focus,button:focus-visible,a:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.pw{position:relative}.pw input{padding-right:64px}
+.pw button{position:absolute;right:6px;top:50%;transform:translateY(-50%);border:0;background:transparent;color:var(--accent);font-size:.82rem;padding:6px 8px;border-radius:6px}
+button{font:inherit;cursor:pointer}
+.primary{width:100%;margin-top:20px;padding:12px;border:0;border-radius:8px;background:var(--accent);color:var(--accent-ink);font-weight:700}
+.primary:disabled{opacity:.6;cursor:wait}
+.msg{min-height:1.6em;margin-top:10px;font-size:.88rem}
+.msg.err{color:var(--warn)}.msg.ok{color:var(--ok)}
+.hint{margin-top:18px;padding-top:16px;border-top:1px solid var(--line);font-size:.82rem;color:var(--sub)}
+.hint code{background:var(--bg);padding:1px 6px;border-radius:4px;font-size:.95em}
+.head{display:flex;justify-content:space-between;align-items:flex-end;gap:12px;flex-wrap:wrap;margin-bottom:20px}
+.ghost{padding:8px 14px;border:1px solid var(--line);border-radius:8px;background:transparent;color:var(--ink)}
+.apps{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:14px}
+.app{display:block;padding:18px;border:1px solid var(--line);border-radius:12px;background:var(--surface);color:inherit;text-decoration:none}
+.app:hover{border-color:var(--accent)}
+.app b{display:block;margin:8px 0 2px}
+.dot{width:34px;height:34px;border-radius:10px;display:grid;place-items:center;font-weight:700;color:#fff}
+.sess{font-size:.85rem;color:var(--sub);margin-top:22px}
+[hidden]{display:none!important}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<main>
+  <div class="brand"><div class="mark" aria-hidden="true">S</div><span id="org">社内ポータル</span></div>
+  <ol class="flow" id="flow" aria-label="サインインの流れ">
+    <li class="on"><span>入力</span></li>
+    <li><span>認証サーバーで確認</span></li>
+    <li><span>ポータルに戻る</span></li>
+  </ol>
+
+  <section id="login">
+    <form class="card" id="form" novalidate>
+      <h1>サインイン</h1>
+      <p class="sub">ユーザー名とパスワードを入力してください。</p>
+      <div class="field">
+        <label for="user">ユーザー名</label>
+        <input id="user" name="username" type="text" autocomplete="username" autocapitalize="none" spellcheck="false">
+      </div>
+      <div class="field">
+        <label for="pass">パスワード</label>
+        <div class="pw">
+          <input id="pass" name="password" type="password" autocomplete="current-password">
+          <button type="button" id="toggle" aria-controls="pass">表示</button>
+        </div>
+      </div>
+      <button class="primary" id="go" type="submit">サインイン</button>
+      <div class="msg" id="msg" role="status" aria-live="polite"></div>
+      <div class="hint" id="hint"></div>
+    </form>
+  </section>
+
+  <section id="home" hidden>
+    <div class="head">
+      <div><h1 id="hello"></h1><p class="sub">ログインしたまま、すべてのアプリを開けます。</p></div>
+      <button class="ghost" id="out">サインアウト</button>
+    </div>
+    <div class="apps">
+      <a class="app" href="#"><div class="dot" style="background:#2b6cb0">勤</div><b>勤怠管理</b><span class="sub">打刻・休暇申請</span></a>
+      <a class="app" href="#"><div class="dot" style="background:#b7791f">経</div><b>経費精算</b><span class="sub">申請・承認</span></a>
+      <a class="app" href="#"><div class="dot" style="background:#2f855a">社</div><b>社内Wiki</b><span class="sub">ナレッジ検索</span></a>
+      <a class="app" href="#"><div class="dot" style="background:#9b2c6b">人</div><b>人事システム</b><span class="sub">給与明細・各種手続き</span></a>
+    </div>
+    <p class="sess">サインイン方法：ユーザー名とパスワード</p>
+  </section>
+</main>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.0/dist/umd/supabase.js"></script>
+<script>
+(function(){
+  /* ===== 設定：本番ではここだけ書き換える ===== */
+  var CONFIG={
+    orgName:"社内ポータル",
+    helpText:"サインインできない場合は、情報システム担当にお問い合わせください。",
+    demoMode:true,            /* false にするとSupabaseで実際に認証する */
+    supabaseUrl:"https://YOUR-PROJECT.supabase.co",  /* SupabaseのProject URL */
+    supabaseKey:"YOUR-ANON-KEY",                      /* anon（publishable）キーのみ。service_roleは絶対に入れない */
+    usernameDomain:"users.example.com",               /* ユーザー名 → ユーザー名@このドメイン に変換してログイン */
+    loginUrl:"/api/login",    /* Supabase以外の自前サーバーを使う場合のみ */
+    demoAccount:{user:"demo",pass:"demo1234"}  /* デモ専用。本番では使われない */
+  };
+  /* ============================================ */
+  var $=function(i){return document.getElementById(i)};
+  var steps=document.querySelectorAll("#flow li");
+  var fails=0;
+  var sb=(!CONFIG.demoMode&&window.supabase)?window.supabase.createClient(CONFIG.supabaseUrl,CONFIG.supabaseKey):null;
+  function setStep(n){steps.forEach(function(li,i){li.classList.toggle("on",i<=n)})}
+  function say(t,c){var m=$("msg");m.textContent=t;m.className="msg "+(c||"")}
+  var wait=function(ms){return new Promise(function(r){setTimeout(r,ms)})};
+  $("org").textContent=CONFIG.orgName;
+  document.title=CONFIG.orgName+" | サインイン";
+  if(CONFIG.demoMode){
+    $("hint").innerHTML="デモ用アカウント：ユーザー名 <code>"+CONFIG.demoAccount.user+"</code>／パスワード <code>"+CONFIG.demoAccount.pass+"</code>";
+  }else{$("hint").textContent=CONFIG.helpText}
+
+  async function check(u,p){
+    if(CONFIG.demoMode){
+      await wait(800);
+      return u===CONFIG.demoAccount.user&&p===CONFIG.demoAccount.pass?{ok:true,name:u}:{ok:false};
+    }
+    if(sb){
+      var em=u.indexOf("@")>0?u:u+"@"+CONFIG.usernameDomain;
+      var r=await sb.auth.signInWithPassword({email:em,password:p});
+      if(r.error){
+        if([400,401,422].indexOf(r.error.status)>=0)return {ok:false};
+        throw r.error;
+      }
+      return {ok:true,name:u};
+    }
+    var res=await fetch(CONFIG.loginUrl,{method:"POST",credentials:"include",
+      headers:{"Content-Type":"application/json"},body:JSON.stringify({username:u,password:p})});
+    if(res.status===401||res.status===403)return {ok:false};
+    if(!res.ok)throw new Error("server");
+    return res.json();
+  }
+  async function signIn(e){
+    e.preventDefault();
+    var u=$("user").value.trim(),p=$("pass").value;
+    if(!u||!p){say("ユーザー名とパスワードを両方入力してください。","err");return}
+    $("go").disabled=true;$("user").readOnly=$("pass").readOnly=true;
+    setStep(1);say("認証サーバーで確認しています…");
+    var r;
+    try{r=await check(u,p)}catch(err){
+      r=null;setStep(0);say("認証サーバーに接続できません。時間をおいて再度お試しください。","err");
+    }
+    if(r&&r.ok){
+      setStep(2);say("サインインしました。","ok");await wait(400);
+      fails=0;show(r.name||u);return;
+    }
+    if(r){
+      fails++;setStep(0);$("pass").value="";
+      if(fails>=5){
+        say("失敗が続いたため、15秒間入力できません。","err");
+        await wait(15000);fails=0;say("");
+      }else{say("ユーザー名またはパスワードが正しくありません。","err")}
+    }
+    $("go").disabled=false;$("user").readOnly=$("pass").readOnly=false;
+    $("pass").focus();
+  }
+  function show(name){
+    $("login").hidden=true;$("home").hidden=false;
+    $("hello").textContent=name+" さん、こんにちは";
+    $("go").disabled=false;$("user").readOnly=$("pass").readOnly=false;
+  }
+  function signOut(){
+    if(sb)sb.auth.signOut();
+    $("home").hidden=true;$("login").hidden=false;
+    $("user").value=$("pass").value="";say("");setStep(0);$("user").focus();
+  }
+  $("form").addEventListener("submit",signIn);
+  if(sb){sb.auth.getSession().then(function(d){var s=d.data&&d.data.session;if(s)show((s.user.email||"").split("@")[0])})}
+  $("out").addEventListener("click",signOut);
+  $("toggle").addEventListener("click",function(){
+    var show=$("pass").type==="password";
+    $("pass").type=show?"text":"password";
+    this.textContent=show?"隠す":"表示";
+  });
+})();
+</script>
+</body>
+</html>
